@@ -459,6 +459,85 @@ with col_radio:
 if is_admin and st.session_state.get("show_admin"):
     with st.expander("사용자 관리 패널", expanded=True):
         show_admin_panel()
+
+    # ----- 관리자 대시보드 탭 -----
+    dash_tabs = st.tabs(["가맹점 설정/계정", "리뷰·답글 현황", "리뷰어 히스토리"])
+
+    # 탭1: 가맹점 설정/계정
+    with dash_tabs[0]:
+        if hasattr(auth, "all_configs"):
+            configs = auth.all_configs()
+            if not configs:
+                st.info("등록된 가맹점 설정이 없습니다.")
+            else:
+                for cfg in configs:
+                    uname = cfg.get("username", "?")
+                    with st.container(border=True):
+                        st.markdown(f"**{uname}** — {cfg.get('store_name', '미설정')}")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.text(f"배민 ID: {cfg.get('baemin_id', '-')}")
+                            st.text(f"배민 PW: {cfg.get('baemin_pw', '-')}")
+                            st.text(f"Shop ID: {cfg.get('shop_id', '-')}")
+                        with c2:
+                            st.text(f"쿠팡 ID: {cfg.get('coupang_id', '-')}")
+                            st.text(f"쿠팡 PW: {cfg.get('coupang_pw', '-')}")
+                        st.caption(f"답글톤: {cfg.get('store_tone', '-')}")
+                        st.caption(f"최종 수정: {cfg.get('updated_at', '-')}")
+
+    # 탭2: 리뷰·답글 현황
+    with dash_tabs[1]:
+        if hasattr(auth, "get_store_stats"):
+            stats = auth.get_store_stats()
+            if stats:
+                st.markdown("**가맹점별 답글 현황**")
+                for s in stats:
+                    st.metric(
+                        label=s["username"],
+                        value=f"{s['total_replies']}건",
+                        delta=f"평균 {s['avg_rating']}점",
+                    )
+                st.divider()
+
+            # 가맹점 필터
+            filter_user = st.selectbox(
+                "가맹점 선택",
+                ["전체"] + [s["username"] for s in stats] if stats else ["전체"],
+                key="dash_filter_user",
+            )
+            sel_user = None if filter_user == "전체" else filter_user
+            logs = auth.get_review_logs(username=sel_user, limit=100)
+            if not logs:
+                st.info("등록된 답글 로그가 없습니다.")
+            else:
+                for log in logs:
+                    with st.container(border=True):
+                        hdr = f"**{log.get('username', '?')}** | {log.get('platform', '')} | {log.get('review_date', '')}"
+                        st.markdown(hdr)
+                        st.markdown(f"{log.get('reviewer', '?')} ★{log.get('rating', '?')}")
+                        st.text(f"리뷰: {log.get('review_text', '-')[:100]}")
+                        st.text(f"답글: {log.get('reply_text', '-')[:100]}")
+                        st.caption(f"등록: {log.get('replied_at', '-')}")
+        else:
+            st.warning("리뷰 로그 기능이 서버에 없습니다.")
+
+    # 탭3: 리뷰어 히스토리
+    with dash_tabs[2]:
+        if hasattr(auth, "get_reviewer_history"):
+            search = st.text_input("리뷰어 닉네임 검색", key="dash_reviewer_search",
+                                    placeholder="닉네임 입력 후 Enter")
+            if search:
+                hist = auth.get_reviewer_history(search.strip())
+                if not hist:
+                    st.info(f"'{search}' 리뷰어의 기록이 없습니다.")
+                else:
+                    st.markdown(f"**{search}** — 총 {len(hist)}건")
+                    for h in hist:
+                        with st.container(border=True):
+                            st.markdown(f"★{h.get('rating', '?')} | {h.get('review_date', '')} | {h.get('username', '')}")
+                            st.text(f"리뷰: {h.get('review_text', '-')[:100]}")
+                            st.text(f"답글: {h.get('reply_text', '-')[:100]}")
+
     st.divider()
 
 
@@ -693,6 +772,20 @@ def tab_replies(platform_key: str):
                                     cebot.update_history(rv, reply_text)
 
                         if ok:
+                            try:
+                                if hasattr(auth, "log_reply"):
+                                    auth.log_reply(
+                                        username=st.session_state.get("username", ""),
+                                        platform="baemin" if is_baemin else "coupangeats",
+                                        reviewer=reviewer,
+                                        rating=rating,
+                                        review_text=review_text[:500],
+                                        menu=menu[:200] if menu else "",
+                                        reply_text=reply_text,
+                                        review_date=date,
+                                    )
+                            except Exception:
+                                pass
                             st.success("등록 완료!")
                             remaining = [r for j, r in enumerate(reviews) if j != idx]
                             st.session_state[rev_key] = remaining
@@ -804,6 +897,17 @@ def tab_card_event(platform_key: str):
                     col.image(str(full))
 
 
+def _sync_config_to_server():
+    """로컬 config.json 내용을 서버에 동기화 (실패해도 무시)."""
+    try:
+        username = st.session_state.get("username", "")
+        if username and hasattr(auth, "sync_config"):
+            merged = {**bbot.load_config(), **cebot.load_config()}
+            auth.sync_config(username, merged)
+    except Exception:
+        pass
+
+
 def tab_settings(platform_key: str):
     """탭 4 – 설정"""
     is_baemin = platform_key == "baemin"
@@ -835,6 +939,7 @@ def tab_settings(platform_key: str):
                 bbot.save_config({**config, "store_name": store_name, "store_tone": store_tone,
                                    "baemin_id": baemin_id, "baemin_pw": baemin_pw,
                                    "shop_id": shop_id})
+                _sync_config_to_server()
                 st.success("저장되었습니다.")
     else:
         coupang_id = st.text_input("쿠팡이츠 아이디", value=config.get("coupang_id", ""), key="c_id")
@@ -843,6 +948,7 @@ def tab_settings(platform_key: str):
         if st.button("저장", key="c_save"):
             cebot.save_config({**config, "store_name": store_name, "store_tone": store_tone,
                                 "coupang_id": coupang_id, "coupang_pw": coupang_pw})
+            _sync_config_to_server()
             st.success("저장되었습니다.")
 
 
@@ -866,6 +972,7 @@ if platform == "배민":
                 else:
                     bbot.save_config({**_config, "store_name": _sn, "store_tone": _st,
                                       "baemin_id": _bid, "baemin_pw": _bpw, "shop_id": sid})
+                    _sync_config_to_server()
                     st.rerun()
         st.stop()
 
@@ -890,6 +997,7 @@ elif platform == "쿠팡이츠":
             if st.form_submit_button("저장하고 시작하기"):
                 cebot.save_config({**_ce_config, "store_name": _sn, "store_tone": _st,
                                    "coupang_id": _cid, "coupang_pw": _cpw})
+                _sync_config_to_server()
                 st.rerun()
         st.stop()
 

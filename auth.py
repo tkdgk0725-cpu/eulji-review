@@ -126,3 +126,61 @@ def delete_user(username: str):
 
 def change_password(username: str, new_pw: str) -> dict:
     return _patch(f"/admin/users/{username}/password", {"password": new_pw}, admin=True)
+
+
+# ---------------------------------------------------------------------------
+# 가맹점 설정 동기화
+# ---------------------------------------------------------------------------
+def sync_config(username: str, config: dict) -> dict:
+    return _post("/config/sync", {"username": username, "config": config})
+
+
+def all_configs() -> list[dict]:
+    result = _get("/admin/configs", admin=True)
+    if result and result.get("ok"):
+        return result.get("configs", [])
+    return []
+
+
+def get_config(username: str) -> dict | None:
+    result = _get(f"/admin/configs/{username}", admin=True)
+    if result and result.get("ok"):
+        return result.get("config")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# 리뷰/답글 로그
+# ---------------------------------------------------------------------------
+def log_reply(username: str, platform: str, reviewer: str, rating: int,
+              review_text: str, menu: str, reply_text: str, review_date: str) -> dict:
+    return _post("/reviews/log", {
+        "username": username, "platform": platform,
+        "reviewer": reviewer, "rating": rating,
+        "review_text": review_text, "menu": menu,
+        "reply_text": reply_text, "review_date": review_date,
+    })
+
+
+def get_review_logs(username: str | None = None, limit: int = 200) -> list[dict]:
+    path = f"/admin/reviews?limit={limit}"
+    if username:
+        path += f"&username={username}"
+    result = _get(path, admin=True)
+    if result and result.get("ok"):
+        return result.get("logs", [])
+    return []
+
+
+def get_store_stats() -> list[dict]:
+    result = _get("/admin/reviews/stats", admin=True)
+    if result and result.get("ok"):
+        return result.get("stats", [])
+    return []
+
+
+def get_reviewer_history(reviewer: str) -> list[dict]:
+    result = _get(f"/admin/reviewer/{reviewer}", admin=True)
+    if result and result.get("ok"):
+        return result.get("history", [])
+    return []
