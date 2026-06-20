@@ -1,0 +1,8 @@
+.env
+config.json
+*.json
+!version.json
+__pycache__/
+*.pyc
+*_storage_state.json
+*_history.json
