@@ -526,8 +526,10 @@ def generate_draft_replies(reviews: list[dict]) -> None:
         list(ex.map(_gen, reviews))
 
 
-def submit_reply_by_review_no(page, review_no: str, reply_text: str) -> bool:
-    """가상 리스트를 스크롤하면서 review_no 카드를 찾아 답글 등록."""
+def submit_reply_by_review_no(page, review_no: str, reply_text: str,
+                              reviewer: str = "", review_date: str = "") -> bool:
+    """가상 리스트를 스크롤하면서 카드를 찾아 답글 등록.
+    review_no 우선, 없으면 reviewer+date로 매칭."""
     page.goto(review_url())
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(1000)
@@ -546,14 +548,23 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str) -> bool:
                 text = card.inner_text()
             except Exception:
                 continue
-            m = re.search(r"리뷰번호 (\d+)", text)
-            if not m:
-                continue
-            rno = m.group(1)
-            if rno == review_no:
-                return post_reply(page, card, reply_text)
-            if rno not in seen:
-                seen.add(rno)
+
+            # review_no로 매칭
+            if review_no:
+                m = re.search(r"리뷰번호 (\d+)", text)
+                if m and m.group(1) == review_no:
+                    return post_reply(page, card, reply_text)
+
+            # reviewer 이름 + 날짜로 매칭 (review_no 없을 때)
+            if not review_no and reviewer:
+                if reviewer in text and (not review_date or review_date in text):
+                    open_btn = card.get_by_text(SELECTORS["reply_open_button"])
+                    if open_btn.count() > 0:
+                        return post_reply(page, card, reply_text)
+
+            card_id = text[:80]
+            if card_id not in seen:
+                seen.add(card_id)
                 new_found = True
 
         if not new_found:
@@ -577,7 +588,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str) -> bool:
                 pass
         page.wait_for_timeout(500)
 
-    print(f"[WARN] 리뷰번호 {review_no}를 찾지 못했습니다.")
+    print(f"[WARN] 리뷰를 찾지 못했습니다: review_no={review_no}, reviewer={reviewer}")
     return False
 
 

@@ -700,8 +700,9 @@ def tab_replies(platform_key: str):
             date        = rv.get("date", "")
             menu        = rv.get("menu", "")
             review_text = rv.get("text", "")
-            draft_key   = f"{draft_pfx}{rno}"
-            post_key    = f"{platform_key}_post_{rno}"
+            uid         = rno or f"{idx}_{reviewer}"
+            draft_key   = f"{draft_pfx}{uid}"
+            post_key    = f"{platform_key}_post_{uid}"
             char_limit  = None
         else:
             rno         = str(idx)
@@ -741,7 +742,9 @@ def tab_replies(platform_key: str):
                                 with sync_playwright() as pw:
                                     browser, _ctx, page = bbot.login(pw)
                                     try:
-                                        ok = bbot.submit_reply_by_review_no(page, rno, reply_text)
+                                        ok = bbot.submit_reply_by_review_no(
+                                            page, rno, reply_text,
+                                            reviewer=reviewer, review_date=date)
                                     finally:
                                         browser.close()
                                 if ok:
