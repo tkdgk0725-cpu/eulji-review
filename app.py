@@ -9,26 +9,6 @@ from pathlib import Path
 import streamlit as st
 from playwright.sync_api import sync_playwright
 
-# ---------------------------------------------------------------------------
-# 자동 업데이트 (앱 시작 시 1회)
-# ---------------------------------------------------------------------------
-try:
-    import updater
-
-    if "update_checked" not in st.session_state:
-        st.session_state["update_checked"] = True
-        info = updater.check_update()
-        if info.get("available"):
-            with st.spinner(f"새 버전 발견 (v{info['remote']}) — 업데이트 중..."):
-                result = updater.do_update()
-            if result["updated"]:
-                st.toast(f"업데이트 완료: {', '.join(result['updated'])}", icon="✅")
-                st.info("업데이트가 적용되었습니다. 앱을 새로고침합니다...")
-                time.sleep(1.5)
-                st.rerun()
-except Exception:
-    pass  # 업데이터 없으면 무시 (본사 개발환경)
-
 import baemin_bot as bbot
 import coupangeats_bot as cebot
 
