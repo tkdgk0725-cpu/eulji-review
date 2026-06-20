@@ -11,7 +11,7 @@ try:
 except ImportError:
     sys.exit(0)
 
-GITHUB_RAW = "https://raw.githubusercontent.com/tkdgk0725/eulji-review/main"
+GITHUB_RAW = "https://raw.githubusercontent.com/tkdgk0725-cpu/eulji-review/main"
 BASE_DIR = Path(__file__).parent
 
 UPDATE_FILES = [
