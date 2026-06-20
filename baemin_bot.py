@@ -527,47 +527,70 @@ def generate_draft_replies(reviews: list[dict]) -> None:
 
 
 def submit_reply_by_review_no(page, review_no: str, reply_text: str) -> bool:
-    """리뷰 목록에서 review_no에 해당하는 카드를 찾아 답글을 등록한다."""
+    """가상 리스트를 스크롤하면서 review_no 카드를 찾아 답글 등록."""
     page.goto(review_url())
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(1000)
-    _scroll_load_all(page)
+    _dismiss_baemin_overlays(page)
 
-    cards = page.locator(SELECTORS["review_card"])
-    for i in range(cards.count()):
-        card = cards.nth(i)
-        m = re.search(r"리뷰번호 (\d+)", card.inner_text())
-        if m and m.group(1) == review_no:
-            return post_reply(page, card, reply_text)
+    seen: set[str] = set()
+    stale = 0
+    for _ in range(300):
+        cards = page.locator(SELECTORS["review_card"])
+        count = cards.count()
+        new_found = False
 
+        for i in range(count):
+            card = cards.nth(i)
+            try:
+                text = card.inner_text()
+            except Exception:
+                continue
+            m = re.search(r"리뷰번호 (\d+)", text)
+            if not m:
+                continue
+            rno = m.group(1)
+            if rno == review_no:
+                return post_reply(page, card, reply_text)
+            if rno not in seen:
+                seen.add(rno)
+                new_found = True
+
+        if not new_found:
+            stale += 1
+            if stale >= 5:
+                break
+        else:
+            stale = 0
+
+        if count > 0:
+            last = cards.nth(count - 1)
+            last.scroll_into_view_if_needed()
+            page.wait_for_timeout(200)
+            try:
+                box = last.bounding_box()
+                if box:
+                    page.mouse.move(box["x"] + box["width"] / 2,
+                                    box["y"] + box["height"] / 2)
+                    page.mouse.wheel(0, 600)
+            except Exception:
+                pass
+        page.wait_for_timeout(500)
+
+    print(f"[WARN] 리뷰번호 {review_no}를 찾지 못했습니다.")
     return False
 
 
 def submit_all_replies(page, reviews_with_replies: list[dict]) -> tuple[int, int]:
-    """리뷰 목록을 한 번 열고 순서대로 모든 답글을 등록한다. (ok, fail) 건수 반환."""
-    page.goto(review_url())
-    page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(1000)
-    _scroll_load_all(page)
-
+    """리뷰 목록에서 각 review_no를 찾아 답글을 등록한다. (ok, fail) 건수 반환."""
     ok_count = 0
     fail_count = 0
     for item in reviews_with_replies:
-        review_no = item["review_no"]
-        reply_text = item["reply_text"]
-        cards = page.locator(SELECTORS["review_card"])
-        posted = False
-        for i in range(cards.count()):
-            card = cards.nth(i)
-            m = re.search(r"리뷰번호 (\d+)", card.inner_text())
-            if m and m.group(1) == review_no:
-                posted = post_reply(page, card, reply_text)
-                break
-        if posted:
+        ok = submit_reply_by_review_no(page, item["review_no"], item["reply_text"])
+        if ok:
             ok_count += 1
         else:
             fail_count += 1
-        time.sleep(1)
     return ok_count, fail_count
 
 
