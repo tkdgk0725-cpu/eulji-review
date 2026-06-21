@@ -177,6 +177,20 @@ st.markdown("""
 
 
 # ---------------------------------------------------------------------------
+# 설정 동기화
+# ---------------------------------------------------------------------------
+def _sync_config_to_server():
+    """로컬 config.json 내용을 서버에 동기화 (실패해도 무시)."""
+    try:
+        username = st.session_state.get("username", "")
+        if username and hasattr(auth, "sync_config"):
+            merged = {**bbot.load_config(), **cebot.load_config()}
+            auth.sync_config(username, merged)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # 인증 화면
 # ---------------------------------------------------------------------------
 def show_login():
@@ -900,17 +914,6 @@ def tab_card_event(platform_key: str):
                 full = base_dir / img_path
                 if full.exists():
                     col.image(str(full))
-
-
-def _sync_config_to_server():
-    """로컬 config.json 내용을 서버에 동기화 (실패해도 무시)."""
-    try:
-        username = st.session_state.get("username", "")
-        if username and hasattr(auth, "sync_config"):
-            merged = {**bbot.load_config(), **cebot.load_config()}
-            auth.sync_config(username, merged)
-    except Exception:
-        pass
 
 
 def tab_settings(platform_key: str):
