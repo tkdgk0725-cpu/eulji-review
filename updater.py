@@ -20,6 +20,8 @@ UPDATE_FILES = [
     "coupangeats_bot.py",
     "auth.py",
     "updater.py",
+    "find_card_reviews.py",
+    "find_ce_card_reviews.py",
 ]
 
 updated = []
