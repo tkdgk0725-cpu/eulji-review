@@ -377,7 +377,7 @@ def post_reply(page, card, reply_text: str) -> bool:
 
     _dismiss_baemin_overlays(page)
     open_btn.first.click(force=True)
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(300)
 
     textarea = card.locator(SELECTORS["reply_textarea"])
     if textarea.count() == 0:
@@ -385,7 +385,7 @@ def post_reply(page, card, reply_text: str) -> bool:
         return False
 
     textarea.first.fill(reply_text)
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(150)
 
     submit_btn = card.get_by_role("button", name="등록", exact=True)
     if submit_btn.count() == 0:
@@ -393,7 +393,7 @@ def post_reply(page, card, reply_text: str) -> bool:
         return False
 
     submit_btn.first.click(force=True)
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(800)
     return True
 
 
@@ -532,7 +532,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
     review_no 우선, 없으면 reviewer+date로 매칭."""
     page.goto(review_url())
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(500)
     _dismiss_baemin_overlays(page)
 
     seen: set[str] = set()
@@ -577,7 +577,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(150)
             try:
                 box = last.bounding_box()
                 if box:
@@ -586,7 +586,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
                     page.mouse.wheel(0, 400)
             except Exception:
                 pass
-        page.wait_for_timeout(1000)
+        page.wait_for_timeout(500)
 
     print(f"[WARN] 리뷰를 찾지 못했습니다: review_no={review_no}, reviewer={reviewer}")
     return False
