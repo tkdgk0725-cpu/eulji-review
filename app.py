@@ -202,6 +202,8 @@ def show_login():
             if result["ok"]:
                 st.session_state["authenticated"] = True
                 st.session_state["current_user"]  = result["user"]
+                st.session_state["username"]      = username
+                _sync_config_to_server()
                 st.rerun()
             else:
                 st.error(result["reason"])
