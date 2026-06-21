@@ -492,11 +492,11 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
                 if box:
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)
-                    page.mouse.wheel(0, 600)
+                    page.mouse.wheel(0, 400)
             except Exception:
                 pass
 
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1000)
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
 
@@ -583,10 +583,10 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
                 if box:
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)
-                    page.mouse.wheel(0, 600)
+                    page.mouse.wheel(0, 400)
             except Exception:
                 pass
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1000)
 
     print(f"[WARN] 리뷰를 찾지 못했습니다: review_no={review_no}, reviewer={reviewer}")
     return False
