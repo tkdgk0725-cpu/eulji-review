@@ -178,7 +178,10 @@ cleanup_unused_images()
 with sync_playwright() as playwright:
     browser, context, page = bot.login(playwright)
     page.goto(REVIEW_URL)
-    page.wait_for_load_state("networkidle")
+    try:
+        page.wait_for_load_state("networkidle", timeout=60000)
+    except Exception:
+        pass
     page.wait_for_timeout(1500)
 
     results = []
