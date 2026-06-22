@@ -448,7 +448,10 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
     days=N 이면 최근 N일 이내 리뷰만 반환 (None=전체).
     답글 초안 없음 — generate_draft_replies로 별도 생성."""
     page.goto(review_url())
-    page.wait_for_load_state("networkidle")
+    try:
+        page.wait_for_load_state("networkidle", timeout=60000)
+    except Exception:
+        pass
     page.wait_for_timeout(800)
     _dismiss_baemin_overlays(page)
 
@@ -531,7 +534,10 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
     """가상 리스트를 스크롤하면서 카드를 찾아 답글 등록.
     review_no 우선, 없으면 reviewer+date로 매칭."""
     page.goto(review_url())
-    page.wait_for_load_state("networkidle")
+    try:
+        page.wait_for_load_state("networkidle", timeout=60000)
+    except Exception:
+        pass
     page.wait_for_timeout(500)
     _dismiss_baemin_overlays(page)
 
@@ -610,7 +616,10 @@ def process_reviews(page, history: dict, max_count: int = MAX_REVIEWS) -> int:
 
     while processed < max_count:
         page.goto(review_url())
-        page.wait_for_load_state("networkidle")
+        try:
+        page.wait_for_load_state("networkidle", timeout=60000)
+    except Exception:
+        pass
         page.wait_for_timeout(1000)
 
         cards = page.locator(SELECTORS["review_card"])
