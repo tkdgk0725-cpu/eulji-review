@@ -181,37 +181,16 @@ def build_full_history(page, progress_callback=None) -> dict:
     stale = 0
 
     for iteration in range(500):
-        cards = page.locator(SELECTORS["review_card"])
-        count = cards.count()
+        batch = _extract_visible_cards(page)
         new_found = False
 
-        for i in range(count):
-            try:
-                card = cards.nth(i)
-                text = card.inner_text()
-
-                m_no = re.search(r"리뷰번호 (\d+)", text)
-                review_no = m_no.group(1) if m_no else ""
-                key = f"{review_no}|{text[:60]}"
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                new_found = True
-
-                rv = extract_review(card)
-
-                # 사장님 답글 추출
-                reply_text = ""
-                if "사장님 댓글 수정하기" in text:
-                    lines = text.split("\n")
-                    for j, ln in enumerate(lines):
-                        if "사장님" == ln.strip() and j + 1 < len(lines):
-                            reply_text = lines[j + 1].strip()
-                            break
-
-                all_reviews.append({**rv, "reply": reply_text})
-            except Exception:
+        for rv in batch:
+            key = f"{rv['review_no']}|{rv['reviewer']}|{rv['date']}|{rv['text'][:40]}"
+            if key in seen_keys:
                 continue
+            seen_keys.add(key)
+            new_found = True
+            all_reviews.append(rv)
 
         if progress_callback:
             progress_callback(len(all_reviews))
@@ -223,10 +202,12 @@ def build_full_history(page, progress_callback=None) -> dict:
         else:
             stale = 0
 
+        cards = page.locator(SELECTORS["review_card"])
+        count = cards.count()
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(300)
+            page.wait_for_timeout(200)
             try:
                 box = last.bounding_box()
                 if box:
@@ -235,7 +216,7 @@ def build_full_history(page, progress_callback=None) -> dict:
                     page.mouse.wheel(0, 400)
             except Exception:
                 pass
-        page.wait_for_timeout(1200)
+        page.wait_for_timeout(800)
 
     # 히스토리 구축
     history: dict = {}
@@ -540,8 +521,74 @@ def _parse_baemin_date(date_str: str) -> date | None:
     return None
 
 
+_JS_EXTRACT_ALL = """
+() => {
+    const cards = document.querySelectorAll('[class*="ReviewContent-module"]');
+    const boilerplate = [
+        /^\\d{4}년 \\d{1,2}월 \\d{1,2}일$/,
+        /^리뷰번호 \\d+$/,
+        /^\\d+회 주문 고객$/,
+        /^\\(.*누적 주문\\)$/,
+        /^파트너님에게만 보이는 리뷰입니다\\.$/,
+        /^(배달|포장)리뷰$/,
+        /^좋아요\\d*$/,
+        /^사장님 댓글 등록하기$/,
+    ];
+    return Array.from(cards).map(card => {
+        const text = card.innerText || '';
+        const dateM = text.match(/(\\d{4})년 (\\d{1,2})월 (\\d{1,2})일/);
+        const dateStr = dateM ? dateM[0] : '';
+        const rnoM = text.match(/리뷰번호 (\\d+)/);
+        const reviewNo = rnoM ? rnoM[1] : '';
+        const stars = card.querySelectorAll('svg path[fill="#FFC600"]').length;
+        const badges = new Set(
+            Array.from(card.querySelectorAll('[class*="Badge"]'))
+                 .map(b => b.innerText.trim())
+        );
+        const menuBox = card.querySelector('[class*="ReviewMenus-module"]');
+        const menu = menuBox ? menuBox.innerText.trim().replace(/\\n/g, ', ') : '';
+        const menuSet = new Set(menu ? menu.split(', ') : []);
+        const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
+        let nameIdx = 0;
+        while (nameIdx < lines.length && badges.has(lines[nameIdx])) nameIdx++;
+        const reviewer = nameIdx < lines.length ? lines[nameIdx] : (lines[0] || '익명');
+        const textLines = [];
+        for (let k = nameIdx + 1; k < lines.length; k++) {
+            const ln = lines[k];
+            if (menuSet.has(ln)) continue;
+            if (boilerplate.some(p => p.test(ln))) continue;
+            textLines.push(ln);
+        }
+        const hasReply = text.includes('사장님 댓글 수정하기');
+        let replyText = '';
+        if (hasReply) {
+            for (let k = 0; k < lines.length; k++) {
+                if (lines[k] === '사장님' && k + 1 < lines.length) {
+                    replyText = lines[k + 1];
+                    break;
+                }
+            }
+        }
+        return {
+            reviewer, rating: stars, menu, date: dateStr,
+            review_no: reviewNo, text: textLines.join('\\n'),
+            has_reply: hasReply, reply: replyText,
+        };
+    });
+}
+"""
+
+
+def _extract_visible_cards(page) -> list[dict]:
+    """현재 화면에 보이는 카드를 JavaScript로 한 번에 추출."""
+    try:
+        return page.evaluate(_JS_EXTRACT_ALL)
+    except Exception:
+        return []
+
+
 def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> list[dict]:
-    """미답변 리뷰를 스크래핑해서 반환한다 (가상 리스트 대응).
+    """미답변 리뷰를 스크래핑해서 반환한다 (가상 리스트 대응 + JS 일괄 추출).
     days=N 이면 최근 N일 이내 리뷰만 수집하고 기간 초과 시 즉시 중단.
     days=None 이면 전체 수집."""
     page.goto(review_url())
@@ -560,22 +607,16 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
     found_old = False
 
     for _ in range(300):
-        cards = page.locator(SELECTORS["review_card"])
-        count = cards.count()
+        batch = _extract_visible_cards(page)
         new_found = False
 
-        for i in range(count):
-            try:
-                rv = extract_review(cards.nth(i))
-            except Exception:
-                continue
-            key = f"{rv['reviewer']}|{rv['date']}|{rv.get('review_no', '')}|{rv['text'][:40]}"
+        for rv in batch:
+            key = f"{rv['reviewer']}|{rv['date']}|{rv['review_no']}|{rv['text'][:40]}"
             if key in seen_keys:
                 continue
             seen_keys.add(key)
             new_found = True
 
-            # 기간 초과 리뷰 → 수집하지 않고 스크롤 중단 예약
             if cutoff:
                 d = _parse_baemin_date(rv.get("date", ""))
                 if d and d < cutoff:
@@ -595,10 +636,12 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         else:
             stale = 0
 
+        cards = page.locator(SELECTORS["review_card"])
+        count = cards.count()
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(300)
+            page.wait_for_timeout(200)
             try:
                 box = last.bounding_box()
                 if box:
@@ -608,7 +651,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
             except Exception:
                 pass
 
-        page.wait_for_timeout(1200)
+        page.wait_for_timeout(800)
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
     return results
