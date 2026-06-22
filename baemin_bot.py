@@ -218,7 +218,7 @@ def build_full_history(page, progress_callback=None) -> dict:
 
         if not new_found:
             stale += 1
-            if stale >= 5:
+            if stale >= 10:
                 break
         else:
             stale = 0
@@ -524,7 +524,7 @@ def _scroll_load_all(page):
         cur = page.locator(SELECTORS["review_card"]).count()
         if cur == prev:
             stale += 1
-            if stale >= 5:
+            if stale >= 10:
                 break
         else:
             stale = 0
@@ -590,7 +590,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
 
         if not new_found:
             stale += 1
-            if stale >= 5:
+            if stale >= 10:
                 break
         else:
             stale = 0
@@ -598,7 +598,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(300)
             try:
                 box = last.bounding_box()
                 if box:
@@ -608,7 +608,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
             except Exception:
                 pass
 
-        page.wait_for_timeout(1000)
+        page.wait_for_timeout(1200)
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
     return results
