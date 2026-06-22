@@ -20,10 +20,9 @@ UPDATE_FILES = [
     "coupangeats_bot.py",
     "auth.py",
     "updater.py",
+    "launcher.py",
     "find_card_reviews.py",
     "find_ce_card_reviews.py",
-    "실행.bat",
-    "설치.bat",
 ]
 
 updated = []
@@ -32,23 +31,10 @@ for fname in UPDATE_FILES:
         r = requests.get(f"{GITHUB_RAW}/{fname}", timeout=8)
         if not r.ok:
             continue
-        content = r.content
         target = BASE_DIR / fname
-
-        if fname.endswith(".bat"):
-            # UTF-8 → CP949 변환 + CRLF 줄바꿈 (Windows cmd.exe 호환)
-            text = content.decode("utf-8")
-            text = text.replace("\r\n", "\n").replace("\n", "\r\n")
-            content = text.encode("cp949", errors="replace")
-            orig = target
-            target = BASE_DIR / (fname + ".new")
-            if orig.exists() and orig.read_bytes() == content:
-                continue
-        else:
-            if target.exists() and target.read_bytes() == content:
-                continue
-
-        target.write_bytes(content)
+        if target.exists() and target.read_bytes() == r.content:
+            continue
+        target.write_bytes(r.content)
         updated.append(fname)
     except Exception:
         pass
