@@ -444,9 +444,9 @@ def _parse_baemin_date(date_str: str) -> date | None:
 
 
 def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> list[dict]:
-    """미답변 리뷰를 전부 스크래핑해서 반환한다 (가상 리스트 대응).
-    days=N 이면 최근 N일 이내 리뷰만 반환 (None=전체).
-    답글 초안 없음 — generate_draft_replies로 별도 생성."""
+    """미답변 리뷰를 스크래핑해서 반환한다 (가상 리스트 대응).
+    days=N 이면 최근 N일 이내 리뷰만 수집하고 기간 초과 시 즉시 중단.
+    days=None 이면 전체 수집."""
     page.goto(review_url())
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
@@ -455,10 +455,12 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
     page.wait_for_timeout(800)
     _dismiss_baemin_overlays(page)
 
-    # 가상 리스트: 스크롤하면서 보이는 카드를 계속 수집
+    cutoff = date.today() - timedelta(days=days - 1) if days else None
+
     seen_keys: set[str] = set()
     results: list[dict] = []
     stale = 0
+    found_old = False
 
     for _ in range(300):
         cards = page.locator(SELECTORS["review_card"])
@@ -474,9 +476,20 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
             if key in seen_keys:
                 continue
             seen_keys.add(key)
+            new_found = True
+
+            # 기간 초과 리뷰 → 수집하지 않고 스크롤 중단 예약
+            if cutoff:
+                d = _parse_baemin_date(rv.get("date", ""))
+                if d and d < cutoff:
+                    found_old = True
+                    continue
+
             rv["_history_entry"] = history.get(rv["reviewer"], {"reviews": []})
             results.append(rv)
-            new_found = True
+
+        if found_old:
+            break
 
         if not new_found:
             stale += 1
@@ -485,7 +498,6 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         else:
             stale = 0
 
-        # 카드 1개 분량씩 천천히 스크롤 (가상 리스트가 건너뛰지 않도록)
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
@@ -502,14 +514,6 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         page.wait_for_timeout(1000)
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
-
-    if days is not None:
-        cutoff = date.today() - timedelta(days=days - 1)
-        results = [
-            r for r in results
-            if (d := _parse_baemin_date(r.get("date", ""))) is None or d >= cutoff
-        ]
-
     return results
 
 

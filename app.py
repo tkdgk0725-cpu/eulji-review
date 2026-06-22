@@ -571,7 +571,7 @@ def tab_replies(platform_key: str):
 
     # 기간 선택 (배민·쿠팡이츠 공통)
     period_key = "baemin_period" if is_baemin else "ce_period"
-    options = ["1일", "3일", "7일", "1달"]
+    options = ["1일", "3일", "7일", "1달", "전체"]
     period = st.radio(
         "기간",
         options,
@@ -587,7 +587,7 @@ def tab_replies(platform_key: str):
 
     if fetch_clicked:
         if is_baemin:
-            days_map = {"1일": 1, "3일": 3, "7일": 7, "1달": 30}
+            days_map = {"1일": 1, "3일": 3, "7일": 7, "1달": 30, "전체": None}
             days = days_map[period]
             history = bbot.load_history()
             with st.spinner(f"배민 미답변 리뷰 불러오는 중 ({period})..."):
