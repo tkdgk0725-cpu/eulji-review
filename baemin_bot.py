@@ -535,7 +535,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
     review_no 우선, 없으면 reviewer+date로 매칭."""
     page.goto(review_url())
     try:
-        page.wait_for_load_state("networkidle", timeout=60000)
+        page.wait_for_selector(SELECTORS["review_card"], timeout=15000)
     except Exception:
         pass
     page.wait_for_timeout(300)
