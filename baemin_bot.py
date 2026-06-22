@@ -226,7 +226,7 @@ def build_full_history(page, progress_callback=None) -> dict:
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(300)
             try:
                 box = last.bounding_box()
                 if box:
@@ -235,7 +235,7 @@ def build_full_history(page, progress_callback=None) -> dict:
                     page.mouse.wheel(0, 400)
             except Exception:
                 pass
-        page.wait_for_timeout(1000)
+        page.wait_for_timeout(1200)
 
     # 히스토리 구축
     history: dict = {}
