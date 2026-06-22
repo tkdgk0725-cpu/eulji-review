@@ -538,7 +538,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
         page.wait_for_load_state("networkidle", timeout=60000)
     except Exception:
         pass
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(300)
     _dismiss_baemin_overlays(page)
 
     seen: set[str] = set()
@@ -575,7 +575,7 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
 
         if not new_found:
             stale += 1
-            if stale >= 5:
+            if stale >= 3:
                 break
         else:
             stale = 0
@@ -583,16 +583,15 @@ def submit_reply_by_review_no(page, review_no: str, reply_text: str,
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(150)
             try:
                 box = last.bounding_box()
                 if box:
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)
-                    page.mouse.wheel(0, 400)
+                    page.mouse.wheel(0, 1200)
             except Exception:
                 pass
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(300)
 
     print(f"[WARN] 리뷰를 찾지 못했습니다: review_no={review_no}, reviewer={reviewer}")
     return False
