@@ -362,7 +362,7 @@ def post_reply(page, row_index: int, reply_text: str, page_num: int = 1) -> bool
                 page.wait_for_load_state("networkidle", timeout=8000)
             except PWTimeout:
                 pass
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
 
         dismiss_modal(page)
 
@@ -373,28 +373,27 @@ def post_reply(page, row_index: int, reply_text: str, page_num: int = 1) -> bool
         if btn.count() == 0:
             btn = page.locator("button:has-text('사장님 댓글 등록하기')").first
         btn.click(timeout=5_000)
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(1000)
 
         # 입력 폼 대기
         ta = page.locator("textarea")
         ta.wait_for(timeout=8_000)
         ta.click()
         ta.fill(reply_text[:300])
-        page.wait_for_timeout(600)
+        page.wait_for_timeout(300)
 
         # 등록 버튼 클릭 — exact="등록"으로 "등록하기" 버튼과 구분
         submit_btn = page.get_by_role("button", name="등록", exact=True)
         if submit_btn.count() == 0:
-            # fallback: 텍스트가 정확히 "등록"인 버튼
             submit_btn = page.locator("button").filter(has_text=re.compile(r"^등록$"))
         submit_btn.first.click(timeout=5_000)
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(1500)
 
-        # 성공 확인: 버튼이 "수정하기"로 바뀌거나 사라지면 성공
+        # 성공 확인
         try:
-            page.wait_for_selector("button:has-text('사장님 댓글 수정하기')", timeout=4_000)
+            page.wait_for_selector("button:has-text('사장님 댓글 수정하기')", timeout=3_000)
         except PWTimeout:
-            pass  # 일부 경우 즉시 사라지므로 타임아웃은 실패 아님
+            pass
         return True
 
     except Exception as e:
