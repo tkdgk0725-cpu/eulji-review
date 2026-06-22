@@ -3,6 +3,18 @@ chcp 65001 > nul
 title 을지 리뷰 관리프로그램
 cd /d "%~dp0"
 
+:: 자동 업데이트된 bat 적용
+if exist "실행.bat.new" (
+    copy /y "실행.bat.new" "실행.bat" >nul
+    del "실행.bat.new" >nul
+    start "" "%~f0"
+    exit /b
+)
+if exist "설치.bat.new" (
+    copy /y "설치.bat.new" "설치.bat" >nul
+    del "설치.bat.new" >nul
+)
+
 :: Python 경로 자동 탐지
 set "PY="
 python --version >nul 2>&1 && set "PY=python" && goto :found

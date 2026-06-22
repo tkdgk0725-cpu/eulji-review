@@ -33,8 +33,15 @@ for fname in UPDATE_FILES:
         if not r.ok:
             continue
         target = BASE_DIR / fname
-        if target.exists() and target.read_bytes() == r.content:
-            continue
+        # bat 파일은 실행 중 덮어쓰면 깨지므로 .new로 저장
+        if fname.endswith(".bat"):
+            orig = target
+            target = BASE_DIR / (fname + ".new")
+            if orig.exists() and orig.read_bytes() == r.content:
+                continue
+        else:
+            if target.exists() and target.read_bytes() == r.content:
+                continue
         target.write_bytes(r.content)
         updated.append(fname)
     except Exception:
