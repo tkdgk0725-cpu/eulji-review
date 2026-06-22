@@ -422,6 +422,52 @@ def save_history(history: dict):
     CE_HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def build_full_history(page, progress_callback=None) -> dict:
+    """전체 리뷰(답변 포함)를 긁어서 리뷰어 히스토리를 구축한다.
+    기존 히스토리를 덮어쓴다."""
+    _wait_for_table(page, timeout=8000)
+    page.wait_for_timeout(600)
+    dismiss_modal(page)
+    set_date_filter(page, "1개월")
+
+    all_reviews: list[dict] = []
+    page_num = 1
+    while True:
+        dismiss_modal(page)
+        rows = _parse_rows(page)
+        for r in rows:
+            all_reviews.append(r)
+        if progress_callback:
+            progress_callback(len(all_reviews))
+
+        next_btn = page.locator(f"button:has-text('{page_num + 1}')")
+        if next_btn.count() == 0:
+            break
+        next_btn.first.click()
+        _wait_for_table(page, timeout=5000)
+        page.wait_for_timeout(400)
+        page_num += 1
+        if page_num > 50:
+            break
+
+    history: dict = {}
+    for rv in all_reviews:
+        reviewer = rv["reviewer"]
+        entry = history.get(reviewer, {"reviews": []})
+        entry["reviews"].append({
+            "date": rv.get("date", ""),
+            "order_count": rv.get("order_count", 0),
+            "stars": rv.get("stars", 0),
+            "review_text": rv.get("review_text", ""),
+            "has_replied": rv.get("has_replied", False),
+        })
+        history[reviewer] = entry
+
+    save_history(history)
+    print(f"[INFO] 쿠팡이츠 히스토리 구축 완료: {len(all_reviews)}건 리뷰, {len(history)}명 리뷰어")
+    return history
+
+
 def update_history(review: dict, reply_text: str):
     history = load_history()
     key = review["reviewer"]
