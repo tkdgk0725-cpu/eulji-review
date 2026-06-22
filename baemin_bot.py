@@ -235,6 +235,32 @@ def build_full_history(page, progress_callback=None) -> dict:
 
     save_history(history)
     print(f"[INFO] 히스토리 구축 완료: {len(all_reviews)}건 리뷰, {len(history)}명 리뷰어")
+
+    # 사장님 기존 답글에서 톤 자동 추출 → config.json 저장
+    existing_replies = [rv.get("reply", "") for rv in all_reviews if rv.get("reply", "").strip()]
+    if len(existing_replies) >= 5:
+        picks = existing_replies[:30]
+        samples = "\n".join(f"- {r}" for r in picks)
+        try:
+            resp = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=300,
+                messages=[{"role": "user", "content": (
+                    "아래는 음식점 사장님이 배달앱 리뷰에 직접 작성한 답글 예시들입니다.\n\n"
+                    f"{samples}\n\n"
+                    "이 답글들의 말투, 톤, 길이, 특징을 분석해서 "
+                    "AI가 같은 스타일로 답글을 쓸 수 있도록 프롬프트용 지침을 한국어로 작성해주세요. "
+                    "3줄 이내로 핵심만 간결하게."
+                )}],
+            )
+            extracted_tone = resp.content[0].text.strip()
+            config = load_config()
+            config["store_tone"] = extracted_tone
+            save_config(config)
+            print(f"[INFO] 톤 자동 추출 완료: {extracted_tone[:60]}...")
+        except Exception as e:
+            print(f"[WARN] 톤 추출 실패: {e}")
+
     return history
 
 
@@ -344,28 +370,11 @@ def generate_reply(review: dict, history_entry: dict | None) -> str:
     menu_line = f"- 주문 메뉴: {review_menu}\n" if review_menu else ""
     review_text = review_text_raw or "(작성된 리뷰 내용 없음, 별점만 등록됨)"
 
-    # 히스토리에서 사장님 기존 답글 예시 수집
-    reply_examples = ""
-    all_history = load_history()
-    sample_replies = []
-    for entry in all_history.values():
-        for r in entry.get("reviews", []):
-            rep = r.get("reply", "").strip()
-            if rep and len(rep) > 5:
-                sample_replies.append(rep)
-    if sample_replies:
-        picks = sample_replies[-10:]
-        examples = "\n".join(f"- {r}" for r in picks)
-        reply_examples = f"""
-[사장님 기존 답글 예시 — 이 말투와 스타일을 그대로 따라할 것]
-{examples}
-"""
-
     prompt = f"""당신은 '{store_name}' 사장님을 대신해 배달앱 리뷰에 답글을 작성하는 어시스턴트입니다.
 
 [말투/톤 — 반드시 아래 지침을 최우선으로 따를 것]
 {store_tone}
-{reply_examples}
+
 [리뷰 정보]
 - 별점: {review['rating']}점
 {menu_line}- 리뷰 내용: {review_text}
