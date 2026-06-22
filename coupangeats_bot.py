@@ -87,6 +87,14 @@ def login(playwright):
 
     try:
         page.wait_for_url(lambda url: "/login" not in url, timeout=5_000)
+        # 세션 만료 체크: "권한" 에러가 뜨면 세션 삭제 후 재로그인
+        page.wait_for_timeout(1500)
+        body = page.inner_text("body")
+        if "권한" in body or "접근" in body or "만료" in body:
+            print("[INFO] 세션 만료 감지, 재로그인합니다.")
+            CE_STORAGE_FILE.unlink(missing_ok=True)
+            browser.close()
+            return login(playwright)
         print(f"[INFO] 기존 세션으로 로그인됨. ({page.url})")
         return browser, context, page
     except PWTimeout:
