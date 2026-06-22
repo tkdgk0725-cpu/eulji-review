@@ -344,11 +344,28 @@ def generate_reply(review: dict, history_entry: dict | None) -> str:
     menu_line = f"- 주문 메뉴: {review_menu}\n" if review_menu else ""
     review_text = review_text_raw or "(작성된 리뷰 내용 없음, 별점만 등록됨)"
 
+    # 히스토리에서 사장님 기존 답글 예시 수집
+    reply_examples = ""
+    all_history = load_history()
+    sample_replies = []
+    for entry in all_history.values():
+        for r in entry.get("reviews", []):
+            rep = r.get("reply", "").strip()
+            if rep and len(rep) > 5:
+                sample_replies.append(rep)
+    if sample_replies:
+        picks = sample_replies[-10:]
+        examples = "\n".join(f"- {r}" for r in picks)
+        reply_examples = f"""
+[사장님 기존 답글 예시 — 이 말투와 스타일을 그대로 따라할 것]
+{examples}
+"""
+
     prompt = f"""당신은 '{store_name}' 사장님을 대신해 배달앱 리뷰에 답글을 작성하는 어시스턴트입니다.
 
 [말투/톤 — 반드시 아래 지침을 최우선으로 따를 것]
 {store_tone}
-
+{reply_examples}
 [리뷰 정보]
 - 별점: {review['rating']}점
 {menu_line}- 리뷰 내용: {review_text}

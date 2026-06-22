@@ -321,6 +321,23 @@ def generate_reply(review: dict, config: dict) -> str:
     store_name = config.get("store_name", "우리 가게")
     tone = config.get("store_tone", "친근하고 감사한 말투")
 
+    # 히스토리에서 사장님 기존 답글 예시 수집
+    reply_examples = ""
+    all_history = load_history()
+    sample_replies = []
+    for entry in all_history.values():
+        for r in entry.get("reviews", []):
+            rep = (r.get("reply_text") or r.get("reply", "")).strip()
+            if rep and len(rep) > 5:
+                sample_replies.append(rep)
+    if sample_replies:
+        picks = sample_replies[-10:]
+        examples = "\n".join(f"- {r}" for r in picks)
+        reply_examples = f"""
+[사장님 기존 답글 예시 — 이 말투와 스타일을 그대로 따라할 것]
+{examples}
+"""
+
     prompt = f"""당신은 '{store_name}' 음식점의 사장님입니다.
 아래 쿠팡이츠 리뷰에 대한 답글을 작성해주세요.
 
@@ -331,7 +348,7 @@ def generate_reply(review: dict, config: dict) -> str:
 - 리뷰 내용에 구체적으로 언급된 부분 1~2가지를 반드시 반영
 - 다음에도 방문을 유도하는 내용 포함
 - 답글 본문만 출력, 따옴표나 설명 없이
-
+{reply_examples}
 [리뷰 정보]
 별점: {review['stars']}점
 주문 횟수: {review['order_count']}회
