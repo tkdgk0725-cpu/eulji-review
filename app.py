@@ -681,7 +681,7 @@ def tab_replies(platform_key: str):
                     browser, _ctx, page = cebot.login(pw)
                     try:
                         page.goto(cebot.REVIEW_URL)
-                        cebot.fetch_reviews(page, period=_period_used)
+                        cebot.prepare_page(page, period=_period_used)
                         for i, rv in enumerate(reviews):
                             reply_text = st.session_state.get(f"{draft_pfx}{i}",
                                                                rv.get("draft_reply", ""))
@@ -692,7 +692,6 @@ def tab_replies(platform_key: str):
                                 ok_cnt += 1
                             else:
                                 fail_cnt += 1
-                            time.sleep(2)
                     finally:
                         browser.close()
 
