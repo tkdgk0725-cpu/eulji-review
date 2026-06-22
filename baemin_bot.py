@@ -617,9 +617,9 @@ def process_reviews(page, history: dict, max_count: int = MAX_REVIEWS) -> int:
     while processed < max_count:
         page.goto(review_url())
         try:
-        page.wait_for_load_state("networkidle", timeout=60000)
-    except Exception:
-        pass
+            page.wait_for_load_state("networkidle", timeout=60000)
+        except Exception:
+            pass
         page.wait_for_timeout(1000)
 
         cards = page.locator(SELECTORS["review_card"])
