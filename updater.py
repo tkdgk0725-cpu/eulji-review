@@ -22,6 +22,8 @@ UPDATE_FILES = [
     "updater.py",
     "find_card_reviews.py",
     "find_ce_card_reviews.py",
+    "실행.bat",
+    "설치.bat",
 ]
 
 updated = []
