@@ -329,11 +329,16 @@ print(f"최근 {EXCLUDE_RECENT_RUNS}주 내 선정된 리뷰어 (제외): {exclu
 
 # 카드 인식
 eligible = [r for r in with_images if r["reviewer"] not in excluded]
-print(f"\n카드 인증 사진 확인 중... ({len(eligible)}건)")
-for r in eligible:
+print(f"\n카드 인증 사진 확인 중... ({len(eligible)}건, 5건씩 병렬 처리)")
+from concurrent.futures import ThreadPoolExecutor
+
+def _check_card(r):
     r["card_no"] = detect_card_no(r["local_images"], r["review_text"])
     status = r["card_no"] if r["card_no"] else "미확인"
     print(f"  - {r['reviewer']} ({r['date']}): {status}")
+
+with ThreadPoolExecutor(max_workers=5) as ex:
+    list(ex.map(_check_card, eligible))
 
 with_card = [r for r in eligible if r.get("card_no")]
 print(f"\n카드 인증 확인된 리뷰: {len(with_card)}건")
