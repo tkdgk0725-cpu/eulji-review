@@ -170,10 +170,10 @@ def build_full_history(page, progress_callback=None) -> dict:
     기존 히스토리를 덮어쓴다."""
     page.goto(all_reviews_url())
     try:
-        page.wait_for_load_state("networkidle", timeout=60000)
+        page.wait_for_selector(SELECTORS["review_card"], timeout=15000)
     except Exception:
         pass
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(500)
     _dismiss_baemin_overlays(page)
 
     seen_keys: set[str] = set()
@@ -593,10 +593,10 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
     days=None 이면 전체 수집."""
     page.goto(review_url())
     try:
-        page.wait_for_load_state("networkidle", timeout=60000)
+        page.wait_for_selector(SELECTORS["review_card"], timeout=15000)
     except Exception:
         pass
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(500)
     _dismiss_baemin_overlays(page)
 
     cutoff = date.today() - timedelta(days=days - 1) if days else None
@@ -631,7 +631,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
 
         if not new_found:
             stale += 1
-            if stale >= 10:
+            if stale >= 5:
                 break
         else:
             stale = 0
@@ -641,17 +641,17 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(150)
             try:
                 box = last.bounding_box()
                 if box:
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)
-                    page.mouse.wheel(0, 400)
+                    page.mouse.wheel(0, 500)
             except Exception:
                 pass
 
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(600)
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
     return results
