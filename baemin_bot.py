@@ -180,7 +180,10 @@ def build_full_history(page, progress_callback=None) -> dict:
     all_reviews: list[dict] = []
     stale = 0
 
-    for iteration in range(500):
+    prev_scroll = -1
+    scroll_stuck = 0
+
+    for iteration in range(2000):
         batch = _extract_visible_cards(page)
         new_found = False
 
@@ -195,28 +198,39 @@ def build_full_history(page, progress_callback=None) -> dict:
         if progress_callback:
             progress_callback(len(all_reviews))
 
-        if not new_found:
-            stale += 1
-            if stale >= 10:
-                break
-        else:
-            stale = 0
-
         cards = page.locator(SELECTORS["review_card"])
         count = cards.count()
         if count > 0:
             last = cards.nth(count - 1)
             last.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(150)
             try:
                 box = last.bounding_box()
                 if box:
                     page.mouse.move(box["x"] + box["width"] / 2,
                                     box["y"] + box["height"] / 2)
-                    page.mouse.wheel(0, 400)
+                    page.mouse.wheel(0, 500)
             except Exception:
                 pass
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(600)
+
+        cur_scroll = page.evaluate("window.scrollY || document.documentElement.scrollTop")
+        if new_found:
+            stale = 0
+            scroll_stuck = 0
+        elif cur_scroll == prev_scroll:
+            scroll_stuck += 1
+            if scroll_stuck >= 3:
+                break
+        else:
+            scroll_stuck = 0
+            stale += 1
+            if stale >= 15:
+                break
+        prev_scroll = cur_scroll
+
+        if iteration % 50 == 0 and iteration > 0:
+            print(f"[INFO] 히스토리 수집 중... {len(all_reviews)}건")
 
     # 히스토리 구축
     history: dict = {}
@@ -632,7 +646,10 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
     stale = 0
     found_old = False
 
-    for _ in range(300):
+    prev_scroll = -1
+    scroll_stuck = 0
+
+    for iteration in range(2000):
         batch = _extract_visible_cards(page)
         new_found = False
 
@@ -655,13 +672,7 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
         if found_old:
             break
 
-        if not new_found:
-            stale += 1
-            if stale >= 5:
-                break
-        else:
-            stale = 0
-
+        # 스크롤
         cards = page.locator(SELECTORS["review_card"])
         count = cards.count()
         if count > 0:
@@ -678,6 +689,25 @@ def fetch_unanswered_reviews(page, history: dict, days: int | None = None) -> li
                 pass
 
         page.wait_for_timeout(600)
+
+        # 스크롤 위치로 끝 판단 (새 카드 없어도 스크롤이 움직이면 계속)
+        cur_scroll = page.evaluate("window.scrollY || document.documentElement.scrollTop")
+        if new_found:
+            stale = 0
+            scroll_stuck = 0
+        elif cur_scroll == prev_scroll:
+            scroll_stuck += 1
+            if scroll_stuck >= 3:
+                break
+        else:
+            scroll_stuck = 0
+            stale += 1
+            if stale >= 15:
+                break
+        prev_scroll = cur_scroll
+
+        if iteration % 50 == 0 and iteration > 0:
+            print(f"[INFO] 수집 중... {len(results)}건")
 
     print(f"[INFO] 배민 리뷰 {len(results)}건 수집 완료")
     return results
