@@ -817,6 +817,19 @@ def tab_history(platform_key: str):
     is_baemin = platform_key == "baemin"
     history   = bbot.load_history() if is_baemin else cebot.load_history()
 
+    if is_baemin:
+        if st.button("전체 리뷰 히스토리 구축 (최초 1회)", key="build_hist",
+                      help="이미 답변한 리뷰까지 전부 긁어서 히스토리에 저장합니다. 덮어쓰기 방식."):
+            with st.spinner("전체 리뷰 스크래핑 중... (수 분 소요)"):
+                with sync_playwright() as pw:
+                    browser, _ctx, page = bbot.login(pw)
+                    try:
+                        history = bbot.build_full_history(page)
+                    finally:
+                        browser.close()
+            st.success(f"히스토리 구축 완료! {len(history)}명 리뷰어 저장됨")
+            st.rerun()
+
     query = st.text_input("리뷰어 검색", placeholder="닉네임으로 검색...",
                            key=f"{platform_key}_hist_query", label_visibility="collapsed")
     names = sorted(history.keys())

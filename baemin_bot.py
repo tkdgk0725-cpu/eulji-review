@@ -160,6 +160,103 @@ def make_history_record(review: dict, reply_text: str) -> dict:
     }
 
 
+def all_reviews_url(config: dict | None = None) -> str:
+    config = config or load_config()
+    return f"https://self.baemin.com/shops/{config['shop_id']}/reviews"
+
+
+def build_full_history(page, progress_callback=None) -> dict:
+    """전체 리뷰(답변 포함)를 긁어서 리뷰어 히스토리를 구축한다.
+    기존 히스토리를 덮어쓴다."""
+    page.goto(all_reviews_url())
+    try:
+        page.wait_for_load_state("networkidle", timeout=60000)
+    except Exception:
+        pass
+    page.wait_for_timeout(800)
+    _dismiss_baemin_overlays(page)
+
+    seen_keys: set[str] = set()
+    all_reviews: list[dict] = []
+    stale = 0
+
+    for iteration in range(500):
+        cards = page.locator(SELECTORS["review_card"])
+        count = cards.count()
+        new_found = False
+
+        for i in range(count):
+            try:
+                card = cards.nth(i)
+                text = card.inner_text()
+
+                m_no = re.search(r"리뷰번호 (\d+)", text)
+                review_no = m_no.group(1) if m_no else ""
+                key = f"{review_no}|{text[:60]}"
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                new_found = True
+
+                rv = extract_review(card)
+
+                # 사장님 답글 추출
+                reply_text = ""
+                if "사장님 댓글 수정하기" in text:
+                    lines = text.split("\n")
+                    for j, ln in enumerate(lines):
+                        if "사장님" == ln.strip() and j + 1 < len(lines):
+                            reply_text = lines[j + 1].strip()
+                            break
+
+                all_reviews.append({**rv, "reply": reply_text})
+            except Exception:
+                continue
+
+        if progress_callback:
+            progress_callback(len(all_reviews))
+
+        if not new_found:
+            stale += 1
+            if stale >= 5:
+                break
+        else:
+            stale = 0
+
+        if count > 0:
+            last = cards.nth(count - 1)
+            last.scroll_into_view_if_needed()
+            page.wait_for_timeout(200)
+            try:
+                box = last.bounding_box()
+                if box:
+                    page.mouse.move(box["x"] + box["width"] / 2,
+                                    box["y"] + box["height"] / 2)
+                    page.mouse.wheel(0, 400)
+            except Exception:
+                pass
+        page.wait_for_timeout(1000)
+
+    # 히스토리 구축
+    history: dict = {}
+    for rv in all_reviews:
+        reviewer = rv["reviewer"]
+        entry = history.get(reviewer, {"reviews": []})
+        entry["reviews"].append({
+            "review_no": rv.get("review_no", ""),
+            "date": rv.get("date", ""),
+            "rating": rv.get("rating", 0),
+            "menu": rv.get("menu", ""),
+            "review_text": rv.get("text", ""),
+            "reply": rv.get("reply", ""),
+        })
+        history[reviewer] = entry
+
+    save_history(history)
+    print(f"[INFO] 히스토리 구축 완료: {len(all_reviews)}건 리뷰, {len(history)}명 리뷰어")
+    return history
+
+
 # ---------------------------------------------------------------------------
 # 로그인
 # ---------------------------------------------------------------------------
