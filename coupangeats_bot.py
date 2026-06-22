@@ -352,17 +352,17 @@ def prepare_page(page, period: str = "1일"):
 def post_reply(page, row_index: int, reply_text: str, page_num: int = 1) -> bool:
     """row_index번째 리뷰에 답글 등록. 성공 시 True."""
     try:
-        # 항상 page 1부터 시작해서 목표 페이지로 이동
+        # 목표 페이지로 이동 (1페이지는 기본값이므로 건너뜀)
         dismiss_modal(page)
-        # 현재 페이지가 목표 페이지와 다를 수 있으므로 무조건 이동
-        nav_btn = page.locator(f"button:has-text('{page_num}')")
-        if nav_btn.count() > 0:
-            nav_btn.first.click()
-            try:
-                page.wait_for_load_state("networkidle", timeout=8000)
-            except PWTimeout:
-                pass
-            page.wait_for_timeout(500)
+        if page_num > 1:
+            nav_btn = page.locator(f"button:has-text('{page_num}')")
+            if nav_btn.count() > 0:
+                nav_btn.first.click()
+                try:
+                    page.wait_for_load_state("networkidle", timeout=8000)
+                except PWTimeout:
+                    pass
+                page.wait_for_timeout(500)
 
         dismiss_modal(page)
 
