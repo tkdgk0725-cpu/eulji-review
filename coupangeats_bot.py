@@ -21,6 +21,7 @@ BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.json"
 CE_STORAGE_FILE = BASE_DIR / "ce_storage_state.json"
 CE_HISTORY_FILE = BASE_DIR / "ce_reviewer_history.json"
+CE_NEGATIVE_FILE = BASE_DIR / "ce_negative_reviews.json"
 
 LOGIN_URL = "https://store.coupangeats.com/merchant/login"
 REVIEW_URL = "https://store.coupangeats.com/merchant/management/reviews"
@@ -485,6 +486,67 @@ def build_full_history(page, progress_callback=None) -> dict:
     save_history(history)
     print(f"[INFO] 쿠팡이츠 히스토리 구축 완료: {len(all_reviews)}건 리뷰, {len(history)}명 리뷰어")
     return history
+
+
+def load_negative_reviews() -> list[dict]:
+    if CE_NEGATIVE_FILE.exists():
+        return json.loads(CE_NEGATIVE_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def save_negative_reviews(reviews: list[dict]):
+    CE_NEGATIVE_FILE.write_text(json.dumps(reviews, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def collect_negative_reviews(reviews: list[dict], platform: str = "coupangeats"):
+    """3점 이하 부정 리뷰를 필터링하고 AI 요약을 생성해 저장한다."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    negatives = [r for r in reviews if r.get("stars", r.get("rating", 5)) <= 3]
+    if not negatives:
+        return
+
+    existing = load_negative_reviews()
+    existing_keys = {f"{r.get('reviewer')}|{r.get('date')}|{r.get('platform')}" for r in existing}
+
+    new_items = []
+    for rv in negatives:
+        key = f"{rv.get('reviewer', '')}|{rv.get('date', '')}|{platform}"
+        if key in existing_keys:
+            continue
+        new_items.append({
+            "reviewer": rv.get("reviewer", ""),
+            "date": rv.get("date", ""),
+            "rating": rv.get("stars", rv.get("rating", 0)),
+            "text": rv.get("review_text", rv.get("text", "")),
+            "menu": "",
+            "platform": platform,
+            "summary": "",
+        })
+
+    if not new_items:
+        return
+
+    def _summarize(item):
+        try:
+            resp = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=100,
+                messages=[{"role": "user", "content": (
+                    f"아래 배달앱 부정 리뷰(★{item['rating']}점)의 불만 이유를 1~2문장으로 요약해주세요.\n"
+                    f"리뷰: {item['text'][:300]}"
+                )}],
+            )
+            item["summary"] = resp.content[0].text.strip()
+        except Exception:
+            item["summary"] = "(요약 실패)"
+
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        list(ex.map(_summarize, new_items))
+
+    existing.extend(new_items)
+    save_negative_reviews(existing)
+    print(f"[INFO] 쿠팡이츠 부정 리뷰 {len(new_items)}건 저장 (총 {len(existing)}건)")
 
 
 def update_history(review: dict, reply_text: str):

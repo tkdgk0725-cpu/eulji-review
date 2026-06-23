@@ -477,7 +477,7 @@ if is_admin and st.session_state.get("show_admin"):
         show_admin_panel()
 
     # ----- 관리자 대시보드 탭 -----
-    dash_tabs = st.tabs(["가맹점 설정/계정", "리뷰·답글 현황", "리뷰어 히스토리"])
+    dash_tabs = st.tabs(["가맹점 설정/계정", "리뷰·답글 현황", "리뷰어 히스토리", "부정 리뷰"])
 
     # 탭1: 가맹점 설정/계정
     with dash_tabs[0]:
@@ -554,6 +554,24 @@ if is_admin and st.session_state.get("show_admin"):
                             st.text(f"리뷰: {h.get('review_text', '-')[:100]}")
                             st.text(f"답글: {h.get('reply_text', '-')[:100]}")
 
+    # 탭4: 부정 리뷰
+    with dash_tabs[3]:
+        neg_baemin = bbot.load_negative_reviews() if hasattr(bbot, "load_negative_reviews") else []
+        neg_ce = cebot.load_negative_reviews() if hasattr(cebot, "load_negative_reviews") else []
+        all_neg = sorted(neg_baemin + neg_ce, key=lambda x: x.get("date", ""), reverse=True)
+
+        if not all_neg:
+            st.info("수집된 부정 리뷰가 없습니다.")
+        else:
+            st.markdown(f"**총 {len(all_neg)}건** (배민 {len(neg_baemin)}건, 쿠팡이츠 {len(neg_ce)}건)")
+            for nr in all_neg:
+                platform_label = "배민" if nr.get("platform") == "baemin" else "쿠팡이츠"
+                with st.container(border=True):
+                    st.markdown(f"**★{nr.get('rating', '?')}** | {platform_label} | {nr.get('date', '')} | {nr.get('reviewer', '')}")
+                    st.text(f"리뷰: {nr.get('text', '-')[:150]}")
+                    if nr.get("summary"):
+                        st.error(f"요약: {nr['summary']}")
+
     st.divider()
 
 
@@ -597,6 +615,7 @@ def tab_replies(platform_key: str):
                         reviews = bbot.fetch_unanswered_reviews(page, history, days=days)
                     finally:
                         browser.close()
+            bbot.collect_negative_reviews(reviews, platform="baemin")
             with st.spinner(f"AI 답글 초안 생성 중... ({len(reviews)}건 병렬 처리)"):
                 bbot.generate_draft_replies(reviews)
             st.session_state[rev_key] = reviews
@@ -611,6 +630,7 @@ def tab_replies(platform_key: str):
                         browser.close()
             config = cebot.load_config()
             unanswered = [r for r in all_rv if not r["has_replied"]]
+            cebot.collect_negative_reviews(all_rv, platform="coupangeats")
             with st.spinner(f"AI 답글 초안 생성 중... ({len(unanswered)}건 병렬 처리)"):
                 cebot.generate_draft_replies(unanswered, config)
             st.session_state[rev_key] = unanswered

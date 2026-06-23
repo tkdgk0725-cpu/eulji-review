@@ -44,6 +44,7 @@ MAX_REVIEWS = 5
 HEADLESS = False  # 첫 실행은 False로 두고 로그인/동작을 직접 확인하세요.
 
 HISTORY_FILE = BASE_DIR / "reviewer_history.json"
+NEGATIVE_FILE = BASE_DIR / "negative_reviews.json"
 STORAGE_STATE_FILE = BASE_DIR / "storage_state.json"
 CONFIG_FILE = BASE_DIR / "config.json"
 
@@ -146,6 +147,67 @@ def load_history() -> dict:
 def save_history(history: dict) -> None:
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
+
+
+def load_negative_reviews() -> list[dict]:
+    if NEGATIVE_FILE.exists():
+        return json.loads(NEGATIVE_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def save_negative_reviews(reviews: list[dict]):
+    NEGATIVE_FILE.write_text(json.dumps(reviews, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def collect_negative_reviews(reviews: list[dict], platform: str = "baemin"):
+    """3점 이하 부정 리뷰를 필터링하고 AI 요약을 생성해 저장한다."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    negatives = [r for r in reviews if r.get("rating", 5) <= 3]
+    if not negatives:
+        return
+
+    existing = load_negative_reviews()
+    existing_keys = {f"{r.get('reviewer')}|{r.get('date')}|{r.get('platform')}" for r in existing}
+
+    new_items = []
+    for rv in negatives:
+        key = f"{rv.get('reviewer', '')}|{rv.get('date', '')}|{platform}"
+        if key in existing_keys:
+            continue
+        new_items.append({
+            "reviewer": rv.get("reviewer", ""),
+            "date": rv.get("date", ""),
+            "rating": rv.get("rating", 0),
+            "text": rv.get("text", rv.get("review_text", "")),
+            "menu": rv.get("menu", ""),
+            "platform": platform,
+            "summary": "",
+        })
+
+    if not new_items:
+        return
+
+    def _summarize(item):
+        try:
+            resp = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=100,
+                messages=[{"role": "user", "content": (
+                    f"아래 배달앱 부정 리뷰(★{item['rating']}점)의 불만 이유를 1~2문장으로 요약해주세요.\n"
+                    f"리뷰: {item['text'][:300]}"
+                )}],
+            )
+            item["summary"] = resp.content[0].text.strip()
+        except Exception:
+            item["summary"] = "(요약 실패)"
+
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        list(ex.map(_summarize, new_items))
+
+    existing.extend(new_items)
+    save_negative_reviews(existing)
+    print(f"[INFO] 부정 리뷰 {len(new_items)}건 저장 (총 {len(existing)}건)")
 
 
 def make_history_record(review: dict, reply_text: str) -> dict:
