@@ -967,8 +967,27 @@ def tab_card_event(platform_key: str):
                     col.image(str(full))
 
 
+def tab_negative(platform_key: str):
+    """탭 – 부정 리뷰"""
+    is_baemin = platform_key == "baemin"
+    negatives = bbot.load_negative_reviews() if is_baemin else cebot.load_negative_reviews()
+    platform_label = "배민" if is_baemin else "쿠팡이츠"
+
+    if not negatives:
+        st.info(f"{platform_label} 부정 리뷰가 없습니다. 리뷰 불러오기 시 3점 이하 리뷰가 자동 수집됩니다.")
+        return
+
+    st.markdown(f"**{platform_label} 부정 리뷰 {len(negatives)}건**")
+    for nr in reversed(negatives):
+        with st.container(border=True):
+            st.markdown(f"**★{nr.get('rating', '?')}** | {nr.get('date', '')} | {nr.get('reviewer', '')}")
+            st.text(f"리뷰: {nr.get('text', '-')[:150]}")
+            if nr.get("summary"):
+                st.error(f"요약: {nr['summary']}")
+
+
 def tab_settings(platform_key: str):
-    """탭 4 – 설정"""
+    """탭 – 설정"""
     is_baemin = platform_key == "baemin"
     config    = bbot.load_config() if is_baemin else cebot.load_config()
 
@@ -1035,11 +1054,12 @@ if platform == "배민":
                     st.rerun()
         st.stop()
 
-    t1, t2, t3, t4 = st.tabs(["답글 검토/등록", "리뷰어 히스토리", "주간 카드이벤트", "설정"])
+    t1, t2, t3, t4, t5 = st.tabs(["답글 검토/등록", "리뷰어 히스토리", "주간 카드이벤트", "부정 리뷰", "설정"])
     with t1: tab_replies("baemin")
     with t2: tab_history("baemin")
     with t3: tab_card_event("baemin")
-    with t4: tab_settings("baemin")
+    with t4: tab_negative("baemin")
+    with t5: tab_settings("baemin")
 
 # ===========================================================================
 #  쿠팡이츠
@@ -1060,8 +1080,9 @@ elif platform == "쿠팡이츠":
                 st.rerun()
         st.stop()
 
-    t1, t2, t3, t4 = st.tabs(["답글 검토/등록", "리뷰어 히스토리", "주간 카드이벤트", "설정"])
+    t1, t2, t3, t4, t5 = st.tabs(["답글 검토/등록", "리뷰어 히스토리", "주간 카드이벤트", "부정 리뷰", "설정"])
     with t1: tab_replies("coupangeats")
     with t2: tab_history("coupangeats")
     with t3: tab_card_event("coupangeats")
-    with t4: tab_settings("coupangeats")
+    with t4: tab_negative("coupangeats")
+    with t5: tab_settings("coupangeats")
