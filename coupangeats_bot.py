@@ -500,6 +500,34 @@ def build_full_history(page, progress_callback=None) -> dict:
 
     save_history(history)
     print(f"[INFO] 쿠팡이츠 히스토리 구축 완료: {len(all_reviews)}건 리뷰, {len(history)}명 리뷰어")
+
+    # Supabase에 리뷰 로그 일괄 동기화
+    try:
+        try:
+            import auth_client as _auth
+        except ImportError:
+            import auth as _auth
+        if hasattr(_auth, "log_reply"):
+            import streamlit as st
+            username = st.session_state.get("username", "")
+            synced = 0
+            for rv in all_reviews:
+                if rv.get("has_replied"):
+                    _auth.log_reply(
+                        username=username, platform="coupangeats",
+                        reviewer=rv.get("reviewer", ""),
+                        rating=rv.get("stars", 0),
+                        review_text=rv.get("review_text", "")[:500],
+                        menu="",
+                        reply_text="(히스토리 구축)",
+                        review_date=rv.get("date", ""),
+                    )
+                    synced += 1
+            print(f"[INFO] Supabase 동기화: {synced}건 답글 로그")
+        collect_negative_reviews(all_reviews, platform="coupangeats")
+    except Exception as e:
+        print(f"[WARN] Supabase 동기화 실패: {e}")
+
     return history
 
 

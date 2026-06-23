@@ -356,6 +356,34 @@ def build_full_history(page, progress_callback=None) -> dict:
         except Exception as e:
             print(f"[WARN] 톤 추출 실패: {e}")
 
+    # Supabase에 리뷰 로그 일괄 동기화
+    try:
+        try:
+            import auth_client as _auth
+        except ImportError:
+            import auth as _auth
+        if hasattr(_auth, "log_reply"):
+            import streamlit as st
+            username = st.session_state.get("username", "")
+            synced = 0
+            for rv in all_reviews:
+                if rv.get("reply", "").strip():
+                    _auth.log_reply(
+                        username=username, platform="baemin",
+                        reviewer=rv.get("reviewer", ""),
+                        rating=rv.get("rating", 0),
+                        review_text=rv.get("text", "")[:500],
+                        menu=rv.get("menu", "")[:200],
+                        reply_text=rv.get("reply", ""),
+                        review_date=rv.get("date", ""),
+                    )
+                    synced += 1
+            print(f"[INFO] Supabase 동기화: {synced}건 답글 로그")
+        # 부정 리뷰도 동기화
+        collect_negative_reviews(all_reviews, platform="baemin")
+    except Exception as e:
+        print(f"[WARN] Supabase 동기화 실패: {e}")
+
     return history
 
 
