@@ -81,14 +81,25 @@ def login(playwright):
     if not is_configured(config):
         raise RuntimeError("쿠팡이츠 로그인 정보(아이디/비밀번호)가 설정되지 않았습니다. '설정' 탭에서 입력해주세요.")
 
-    # 항상 새로 로그인 (쿠팡이츠는 브라우저 닫으면 세션 즉시 만료)
-    CE_STORAGE_FILE.unlink(missing_ok=True)
-
-    storage = None
+    storage = str(CE_STORAGE_FILE) if CE_STORAGE_FILE.exists() else None
     browser, context = _make_context(playwright, storage_state=storage)
     page = context.new_page()
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(LOGIN_URL)
+
+    try:
+        page.wait_for_url(lambda url: "/login" not in url, timeout=5_000)
+        page.wait_for_timeout(1000)
+        body = page.inner_text("body")
+        if "권한" in body:
+            print("[INFO] 세션 만료, 재로그인이 필요합니다.")
+            CE_STORAGE_FILE.unlink(missing_ok=True)
+            browser.close()
+            return login(playwright)
+        print(f"[INFO] 기존 세션으로 로그인됨. ({page.url})")
+        return browser, context, page
+    except PWTimeout:
+        pass
 
     # 로그인 폼 입력
     try:
@@ -98,21 +109,13 @@ def login(playwright):
     page.wait_for_timeout(500)
 
     try:
-        page.fill("#loginId", "")
-        page.fill("#loginId", config["coupang_id"])
+        page.locator("#loginId").click()
+        page.locator("#loginId").fill(config["coupang_id"])
         page.wait_for_timeout(300)
-        page.fill("#password", "")
-        page.fill("#password", config["coupang_pw"])
+        page.locator("#password").click()
+        page.locator("#password").fill(config["coupang_pw"])
         page.wait_for_timeout(300)
-        page.click("button[type='submit']")
-        page.wait_for_timeout(500)
-        # 한 번 더 클릭 (첫 클릭이 무시될 때 대비)
-        try:
-            submit = page.locator("button[type='submit']")
-            if submit.count() > 0:
-                submit.first.click()
-        except Exception:
-            pass
+        page.locator("#password").press("Enter")
     except Exception as e:
         print(f"[WARN] 로그인 폼 입력 실패: {e}")
 
@@ -120,9 +123,16 @@ def login(playwright):
         page.wait_for_url(lambda url: "/login" not in url, timeout=120_000)
         print(f"[INFO] 쿠팡이츠 로그인 완료. ({page.url})")
     except PWTimeout:
-        print(f"[WARN] 로그인 완료 감지 실패. 현재 URL: {page.url}")
+        print(f"[WARN] 브라우저에서 직접 로그인해주세요. 로그인 후 자동으로 진행됩니다.")
+        try:
+            page.wait_for_url(lambda url: "/login" not in url, timeout=300_000)
+            print(f"[INFO] 수동 로그인 완료. ({page.url})")
+        except PWTimeout:
+            print(f"[ERROR] 로그인 시간 초과.")
 
-    page.wait_for_timeout(2000)
+    context.storage_state(path=str(CE_STORAGE_FILE))
+    print("[INFO] 로그인 세션 저장 완료.")
+    page.wait_for_timeout(1000)
     return browser, context, page
 
 

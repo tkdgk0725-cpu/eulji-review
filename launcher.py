@@ -38,15 +38,7 @@ def start_streamlit():
     )
 
 
-def cleanup_old_sessions():
-    for f in ["ce_storage_state.json", "storage_state.json"]:
-        p = BASE_DIR / f
-        if p.exists():
-            p.unlink()
-
-
 if __name__ == "__main__":
     run_updater()
-    cleanup_old_sessions()
     threading.Thread(target=open_browser_delayed, daemon=True).start()
     start_streamlit()
