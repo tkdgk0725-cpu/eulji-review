@@ -14,7 +14,8 @@ load_dotenv(Path(__file__).parent / ".env")
 _SERVER_URL = os.getenv("AUTH_SERVER_URL", "").rstrip("/")
 _API_KEY    = os.getenv("AUTH_API_KEY",    "euljireview2026")
 _ADMIN_KEY  = os.getenv("AUTH_ADMIN_KEY",  "euljiadmin2026")
-_TIMEOUT    = 8
+_TIMEOUT    = 30
+_MAX_RETRIES = 3
 
 USERS_FILE  = Path(__file__).parent / "users.json"   # 클라우드 버전에선 미사용
 
@@ -23,28 +24,38 @@ def _post(path, data, *, admin=False):
     key = _ADMIN_KEY if admin else _API_KEY
     if not _SERVER_URL:
         return {"ok": False, "reason": "AUTH_SERVER_URL 이 설정되지 않았습니다."}
-    try:
-        r = requests.post(f"{_SERVER_URL}{path}", json=data,
-                          headers={"X-API-Key": key}, timeout=_TIMEOUT)
-        return r.json()
-    except requests.exceptions.ConnectionError:
-        return {"ok": False, "reason": "인증 서버에 연결할 수 없습니다."}
-    except requests.exceptions.Timeout:
-        return {"ok": False, "reason": "인증 서버 응답 시간 초과."}
-    except Exception as e:
-        return {"ok": False, "reason": str(e)}
+    import time
+    for attempt in range(_MAX_RETRIES):
+        try:
+            r = requests.post(f"{_SERVER_URL}{path}", json=data,
+                              headers={"X-API-Key": key}, timeout=_TIMEOUT)
+            return r.json()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(3)
+                continue
+            return {"ok": False, "reason": "인증 서버 연결 실패 (서버 시작 중일 수 있습니다. 다시 시도해주세요.)"}
+        except Exception as e:
+            return {"ok": False, "reason": str(e)}
 
 
 def _get(path, *, admin=False):
     key = _ADMIN_KEY if admin else _API_KEY
     if not _SERVER_URL:
         return None
-    try:
-        r = requests.get(f"{_SERVER_URL}{path}",
-                         headers={"X-API-Key": key}, timeout=_TIMEOUT)
-        return r.json()
-    except Exception:
-        return None
+    import time
+    for attempt in range(_MAX_RETRIES):
+        try:
+            r = requests.get(f"{_SERVER_URL}{path}",
+                             headers={"X-API-Key": key}, timeout=_TIMEOUT)
+            return r.json()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(3)
+                continue
+            return None
+        except Exception:
+            return None
 
 
 def _patch(path, data, *, admin=False):
