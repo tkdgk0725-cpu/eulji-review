@@ -108,27 +108,32 @@ def login(playwright):
         pass
     page.wait_for_timeout(500)
 
-    try:
-        page.locator("#loginId").click()
-        page.locator("#loginId").fill(config["coupang_id"])
-        page.wait_for_timeout(300)
-        page.locator("#password").click()
-        page.locator("#password").fill(config["coupang_pw"])
-        page.wait_for_timeout(300)
-        page.locator("#password").press("Enter")
-    except Exception as e:
-        print(f"[WARN] 로그인 폼 입력 실패: {e}")
-
-    try:
-        page.wait_for_url(lambda url: "/login" not in url, timeout=120_000)
-        print(f"[INFO] 쿠팡이츠 로그인 완료. ({page.url})")
-    except PWTimeout:
-        print(f"[WARN] 브라우저에서 직접 로그인해주세요. 로그인 후 자동으로 진행됩니다.")
+    for attempt in range(15):
         try:
-            page.wait_for_url(lambda url: "/login" not in url, timeout=300_000)
-            print(f"[INFO] 수동 로그인 완료. ({page.url})")
+            page.locator("#loginId").click()
+            page.locator("#loginId").fill(config["coupang_id"])
+            page.wait_for_timeout(200)
+            page.locator("#password").click()
+            page.locator("#password").fill(config["coupang_pw"])
+            page.wait_for_timeout(200)
+            page.get_by_role("button", name="로그인").click()
+        except Exception as e:
+            print(f"[WARN] 로그인 폼 입력 실패: {e}")
+
+        try:
+            page.wait_for_url(lambda url: "/login" not in url, timeout=5_000)
+            print(f"[INFO] 쿠팡이츠 로그인 완료. (시도 {attempt+1}회)")
+            break
         except PWTimeout:
-            print(f"[ERROR] 로그인 시간 초과.")
+            if attempt < 14:
+                print(f"[INFO] 로그인 재시도 중... ({attempt+1}/15)")
+            else:
+                print(f"[WARN] 자동 로그인 실패. 브라우저에서 직접 로그인해주세요.")
+                try:
+                    page.wait_for_url(lambda url: "/login" not in url, timeout=300_000)
+                    print(f"[INFO] 수동 로그인 완료. ({page.url})")
+                except PWTimeout:
+                    print(f"[ERROR] 로그인 시간 초과.")
 
     context.storage_state(path=str(CE_STORAGE_FILE))
     print("[INFO] 로그인 세션 저장 완료.")
