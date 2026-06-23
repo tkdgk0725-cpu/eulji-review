@@ -125,6 +125,25 @@ def login(playwright):
     return browser, context, page
 
 
+def _check_auth_error(page, playwright):
+    """페이지 이동 후 권한 에러 감지 → 세션 삭제 + 재로그인 + 재이동."""
+    try:
+        page.wait_for_timeout(1000)
+        body = page.inner_text("body")
+        if "권한" in body or "접근" in body or "만료" in body:
+            print("[INFO] 권한 에러 감지, 세션 삭제 후 재로그인합니다.")
+            CE_STORAGE_FILE.unlink(missing_ok=True)
+            url = page.url
+            page.context.browser.close()
+            browser, context, new_page = login(playwright)
+            new_page.goto(url)
+            new_page.wait_for_timeout(1500)
+            return browser, context, new_page, True
+    except Exception:
+        pass
+    return None, None, page, False
+
+
 def dismiss_modal(page):
     """공지사항 팝업이 클릭을 가로막지 않도록 pointerEvents 비활성화."""
     page.evaluate(

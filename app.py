@@ -833,6 +833,9 @@ def tab_history(platform_key: str):
                     browser, _ctx, page = cebot.login(pw)
                     try:
                         page.goto(cebot.REVIEW_URL)
+                        _b, _c, page, retried = cebot._check_auth_error(page, pw)
+                        if retried:
+                            browser = _b
                         history = cebot.build_full_history(page)
                     finally:
                         browser.close()
