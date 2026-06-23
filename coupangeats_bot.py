@@ -556,6 +556,24 @@ def collect_negative_reviews(reviews: list[dict], platform: str = "coupangeats")
     save_negative_reviews(existing)
     print(f"[INFO] 쿠팡이츠 부정 리뷰 {len(new_items)}건 저장 (총 {len(existing)}건)")
 
+    try:
+        try:
+            import auth_client as _auth
+        except ImportError:
+            import auth as _auth
+        if hasattr(_auth, "log_negative_review"):
+            import streamlit as st
+            username = st.session_state.get("username", "")
+            for item in new_items:
+                _auth.log_negative_review(
+                    username=username, platform="coupangeats",
+                    reviewer=item["reviewer"], rating=item["rating"],
+                    review_text=item["text"], summary=item["summary"],
+                    review_date=item["date"],
+                )
+    except Exception:
+        pass
+
 
 def update_history(review: dict, reply_text: str):
     history = load_history()

@@ -190,6 +190,26 @@ def get_store_stats() -> list[dict]:
     return []
 
 
+def log_negative_review(username: str, platform: str, reviewer: str, rating: int,
+                        review_text: str, summary: str, review_date: str) -> dict:
+    return _post("/reviews/negative", {
+        "username": username, "platform": platform,
+        "reviewer": reviewer, "rating": rating,
+        "review_text": review_text, "summary": summary,
+        "review_date": review_date,
+    })
+
+
+def get_negative_reviews(username: str | None = None) -> list[dict]:
+    path = "/admin/reviews/negative"
+    if username:
+        path += f"?username={username}"
+    result = _get(path, admin=True)
+    if result and result.get("ok"):
+        return result.get("reviews", [])
+    return []
+
+
 def get_reviewer_history(reviewer: str) -> list[dict]:
     result = _get(f"/admin/reviewer/{reviewer}", admin=True)
     if result and result.get("ok"):

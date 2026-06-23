@@ -556,19 +556,26 @@ if is_admin and st.session_state.get("show_admin"):
 
     # 탭4: 부정 리뷰
     with dash_tabs[3]:
-        neg_baemin = bbot.load_negative_reviews() if hasattr(bbot, "load_negative_reviews") else []
-        neg_ce = cebot.load_negative_reviews() if hasattr(cebot, "load_negative_reviews") else []
-        all_neg = sorted(neg_baemin + neg_ce, key=lambda x: x.get("date", ""), reverse=True)
+        if hasattr(auth, "get_negative_reviews"):
+            all_neg = auth.get_negative_reviews()
+        else:
+            neg_baemin = bbot.load_negative_reviews() if hasattr(bbot, "load_negative_reviews") else []
+            neg_ce = cebot.load_negative_reviews() if hasattr(cebot, "load_negative_reviews") else []
+            all_neg = sorted(neg_baemin + neg_ce, key=lambda x: x.get("date", ""), reverse=True)
 
         if not all_neg:
             st.info("수집된 부정 리뷰가 없습니다.")
         else:
-            st.markdown(f"**총 {len(all_neg)}건** (배민 {len(neg_baemin)}건, 쿠팡이츠 {len(neg_ce)}건)")
+            st.markdown(f"**총 {len(all_neg)}건**")
             for nr in all_neg:
                 platform_label = "배민" if nr.get("platform") == "baemin" else "쿠팡이츠"
+                uname = nr.get("username", "")
                 with st.container(border=True):
-                    st.markdown(f"**★{nr.get('rating', '?')}** | {platform_label} | {nr.get('date', '')} | {nr.get('reviewer', '')}")
-                    st.text(f"리뷰: {nr.get('text', '-')[:150]}")
+                    header = f"**★{nr.get('rating', '?')}** | {platform_label} | {nr.get('review_date', nr.get('date', ''))} | {nr.get('reviewer', '')}"
+                    if uname:
+                        header += f" | {uname}"
+                    st.markdown(header)
+                    st.text(f"리뷰: {nr.get('review_text', nr.get('text', '-'))[:150]}")
                     if nr.get("summary"):
                         st.error(f"요약: {nr['summary']}")
 

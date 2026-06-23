@@ -209,6 +209,25 @@ def collect_negative_reviews(reviews: list[dict], platform: str = "baemin"):
     save_negative_reviews(existing)
     print(f"[INFO] 부정 리뷰 {len(new_items)}건 저장 (총 {len(existing)}건)")
 
+    # Supabase 동기화
+    try:
+        try:
+            import auth_client as _auth
+        except ImportError:
+            import auth as _auth
+        if hasattr(_auth, "log_negative_review"):
+            import streamlit as st
+            username = st.session_state.get("username", "")
+            for item in new_items:
+                _auth.log_negative_review(
+                    username=username, platform=item.get("platform", "baemin"),
+                    reviewer=item["reviewer"], rating=item["rating"],
+                    review_text=item["text"], summary=item["summary"],
+                    review_date=item["date"],
+                )
+    except Exception:
+        pass
+
 
 def make_history_record(review: dict, reply_text: str) -> dict:
     return {
