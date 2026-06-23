@@ -85,8 +85,8 @@ def login(playwright):
     if CE_STORAGE_FILE.exists():
         import os
         age = time.time() - os.path.getmtime(str(CE_STORAGE_FILE))
-        if age > 7200:
-            print("[INFO] 세션 파일 2시간 경과, 삭제 후 새로 로그인합니다.")
+        if age > 1800:
+            print("[INFO] 세션 파일 30분 경과, 삭제 후 새로 로그인합니다.")
             CE_STORAGE_FILE.unlink(missing_ok=True)
 
     storage = str(CE_STORAGE_FILE) if CE_STORAGE_FILE.exists() else None
