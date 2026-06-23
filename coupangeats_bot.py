@@ -92,15 +92,27 @@ def login(playwright):
 
     # 로그인 폼 입력
     try:
-        page.wait_for_load_state("networkidle", timeout=10_000)
+        page.wait_for_selector("#loginId", timeout=15000)
     except PWTimeout:
         pass
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(500)
 
     try:
+        page.fill("#loginId", "")
         page.fill("#loginId", config["coupang_id"])
+        page.wait_for_timeout(300)
+        page.fill("#password", "")
         page.fill("#password", config["coupang_pw"])
+        page.wait_for_timeout(300)
         page.click("button[type='submit']")
+        page.wait_for_timeout(500)
+        # 한 번 더 클릭 (첫 클릭이 무시될 때 대비)
+        try:
+            submit = page.locator("button[type='submit']")
+            if submit.count() > 0:
+                submit.first.click()
+        except Exception:
+            pass
     except Exception as e:
         print(f"[WARN] 로그인 폼 입력 실패: {e}")
 
