@@ -110,8 +110,7 @@ def login(playwright):
     except PWTimeout:
         print(f"[WARN] 로그인 완료 감지 실패. 현재 URL: {page.url}")
 
-    context.storage_state(path=str(CE_STORAGE_FILE))
-    print("[INFO] 로그인 세션 저장 완료.")
+    page.wait_for_timeout(2000)
     return browser, context, page
 
 
