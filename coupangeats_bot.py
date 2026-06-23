@@ -293,10 +293,12 @@ _CE_PERIOD_MAP: dict[str, tuple[str, int | None]] = {
     "3일": ("최근 1주일", 3),
     "7일": ("최근 1주일", 7),
     "1달": ("1개월",      30),
+    "전체": ("3개월",     None),
     # 하위 호환
     "오늘":      ("오늘",       1),
     "최근 1주일": ("최근 1주일", 7),
     "1개월":     ("1개월",      30),
+    "3개월":     ("3개월",      None),
 }
 
 
@@ -324,7 +326,7 @@ def fetch_reviews(page, period: str = "1일") -> list[dict]:
         _wait_for_table(page, timeout=5000)
         page.wait_for_timeout(400)
         page_num += 1
-        if page_num > 20:
+        if page_num > 100:
             break
 
     if filter_days is not None:
@@ -463,7 +465,11 @@ def build_full_history(page, progress_callback=None) -> dict:
     _wait_for_table(page, timeout=8000)
     page.wait_for_timeout(600)
     dismiss_modal(page)
-    set_date_filter(page, "1개월")
+    # 가장 긴 기간으로 설정 (3개월 시도, 없으면 1개월)
+    try:
+        set_date_filter(page, "3개월")
+    except Exception:
+        set_date_filter(page, "1개월")
 
     all_reviews: list[dict] = []
     page_num = 1
@@ -474,15 +480,16 @@ def build_full_history(page, progress_callback=None) -> dict:
             all_reviews.append(r)
         if progress_callback:
             progress_callback(len(all_reviews))
+        print(f"[INFO] 히스토리 수집 중... 페이지 {page_num}, {len(all_reviews)}건")
 
         next_btn = page.locator(f"button:has-text('{page_num + 1}')")
         if next_btn.count() == 0:
             break
         next_btn.first.click()
-        _wait_for_table(page, timeout=5000)
-        page.wait_for_timeout(400)
+        _wait_for_table(page, timeout=8000)
+        page.wait_for_timeout(600)
         page_num += 1
-        if page_num > 50:
+        if page_num > 200:
             break
 
     history: dict = {}
