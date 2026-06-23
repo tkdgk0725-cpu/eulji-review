@@ -88,14 +88,26 @@ def login(playwright):
 
     try:
         page.wait_for_url(lambda url: "/login" not in url, timeout=5_000)
-        # 세션 만료 체크: "권한" 에러가 뜨면 세션 삭제 후 재로그인
+        # 세션 만료 체크: 관리 페이지 + 리뷰 페이지 둘 다 확인
         page.wait_for_timeout(1500)
         body = page.inner_text("body")
         if "권한" in body or "접근" in body or "만료" in body:
-            print("[INFO] 세션 만료 감지, 재로그인합니다.")
+            print("[INFO] 세션 만료 감지(관리페이지), 재로그인합니다.")
             CE_STORAGE_FILE.unlink(missing_ok=True)
             browser.close()
             return login(playwright)
+        # 리뷰 페이지에서도 권한 체크
+        page.goto(REVIEW_URL)
+        page.wait_for_timeout(2000)
+        body2 = page.inner_text("body")
+        if "권한" in body2 or "접근" in body2 or "만료" in body2:
+            print("[INFO] 세션 만료 감지(리뷰페이지), 재로그인합니다.")
+            CE_STORAGE_FILE.unlink(missing_ok=True)
+            browser.close()
+            return login(playwright)
+        # 리뷰 페이지에서 확인 완료, 관리 페이지로 복귀
+        page.goto(LOGIN_URL.replace("/login", "/merchant/management"))
+        page.wait_for_timeout(500)
         print(f"[INFO] 기존 세션으로 로그인됨. ({page.url})")
         return browser, context, page
     except PWTimeout:
