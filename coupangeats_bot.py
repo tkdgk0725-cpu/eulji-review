@@ -81,33 +81,14 @@ def login(playwright):
     if not is_configured(config):
         raise RuntimeError("쿠팡이츠 로그인 정보(아이디/비밀번호)가 설정되지 않았습니다. '설정' 탭에서 입력해주세요.")
 
-    # 세션 파일이 2시간 이상 지났으면 삭제 (만료 방지)
-    if CE_STORAGE_FILE.exists():
-        import os
-        age = time.time() - os.path.getmtime(str(CE_STORAGE_FILE))
-        if age > 1800:
-            print("[INFO] 세션 파일 30분 경과, 삭제 후 새로 로그인합니다.")
-            CE_STORAGE_FILE.unlink(missing_ok=True)
+    # 항상 새로 로그인 (쿠팡이츠는 브라우저 닫으면 세션 즉시 만료)
+    CE_STORAGE_FILE.unlink(missing_ok=True)
 
-    storage = str(CE_STORAGE_FILE) if CE_STORAGE_FILE.exists() else None
+    storage = None
     browser, context = _make_context(playwright, storage_state=storage)
     page = context.new_page()
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(LOGIN_URL)
-
-    try:
-        page.wait_for_url(lambda url: "/login" not in url, timeout=5_000)
-        page.wait_for_timeout(1000)
-        body = page.inner_text("body")
-        if "권한" in body or "접근" in body or "만료" in body:
-            print("[INFO] 세션 만료 감지, 재로그인합니다.")
-            CE_STORAGE_FILE.unlink(missing_ok=True)
-            browser.close()
-            return login(playwright)
-        print(f"[INFO] 기존 세션으로 로그인됨. ({page.url})")
-        return browser, context, page
-    except PWTimeout:
-        pass
 
     # 로그인 폼 입력
     try:
